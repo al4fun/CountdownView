@@ -1,5 +1,6 @@
 package cn.szx.countdownviewsample;
 
+import android.animation.ValueAnimator;
 import android.content.Context;
 import android.graphics.Canvas;
 import android.graphics.Color;
@@ -8,17 +9,19 @@ import android.graphics.Rect;
 import android.graphics.RectF;
 import android.support.annotation.Nullable;
 import android.view.View;
+import android.view.animation.LinearInterpolator;
 
 public class CountdownView extends View {
     private int width = 200, height = 200;//控件的宽高
     private int strokeWidth = 4;//圆圈宽度
     private int textSize = 48;//文字尺寸
+    private RectF rectF;
+
+    ValueAnimator valueAnimator;
 
     private int duration;//倒计时持续时间，秒
-    private long timeRemainsMili;//剩余时间，毫秒
     private String timeRemians;//剩余时间，秒。用于展示
-    private long step;
-    private int currentDegree = 0;
+    private int currentDegree;
 
     private Paint backgroundPaint, forgroundPaint, textPaint;
     private int backgroundColor = Color.parseColor("#DDDDDD");
@@ -26,7 +29,6 @@ public class CountdownView extends View {
     private int textColor = Color.parseColor("#FE872E");
     private Rect textBounds = new Rect();
 
-    private boolean finished = false;
     private Listener listener;
 
     public interface Listener {
@@ -63,10 +65,8 @@ public class CountdownView extends View {
     }
 
     private void initTime() {
-        timeRemainsMili = duration * 1000;
         timeRemians = String.valueOf(duration);
         textPaint.getTextBounds(timeRemians, 0, timeRemians.length(), textBounds);
-        step = duration * 1000 / 180;//圆弧每旋转2度，大约需要经过的时间间隔(毫秒)。一周360度
     }
 
     @Override
@@ -76,28 +76,45 @@ public class CountdownView extends View {
 
     @Override
     protected void onDraw(Canvas canvas) {
-        //canvas.drawColor(Color.parseColor("#FFFFFF"));
+        if (rectF == null) {
+            rectF = new RectF(strokeWidth / 2, strokeWidth / 2, getWidth() - strokeWidth / 2, getHeight() - strokeWidth / 2);
+        }
 
-        RectF rectF = new RectF(0 + strokeWidth / 2, 0 + strokeWidth / 2, getWidth() - strokeWidth / 2, getHeight() - strokeWidth / 2);
+        //canvas.drawColor(Color.parseColor("#FFFFFF"));
         canvas.drawArc(rectF, 270, 360, false, backgroundPaint);
         canvas.drawArc(rectF, 270, currentDegree, false, forgroundPaint);
         canvas.drawText(timeRemians, getWidth() / 2, getHeight() / 2 + textBounds.height() / 2, textPaint);
+    }
 
-        if (currentDegree < 360) {
-            currentDegree += 2;
-            timeRemainsMili -= step;
-            timeRemians = String.valueOf(timeRemainsMili / 1000 + 1);
-            textPaint.getTextBounds(timeRemians, 0, timeRemians.length(), textBounds);
-            postInvalidateDelayed(step);
-        } else {
-            if (!finished) {
-                finished = true;
-                timeRemians = "0";
-                invalidate();
-                if (listener != null) {
-                    listener.onFinished();
-                }
+    @Override
+    public void onWindowFocusChanged(boolean hasWindowFocus) {
+        super.onWindowFocusChanged(hasWindowFocus);
+
+        if (hasWindowFocus) {//所在窗口获得焦点
+            if (valueAnimator == null) {
+                valueAnimator = ValueAnimator.ofInt(0, 360);//圆弧角度从0到360度
+                valueAnimator.setDuration(duration * 1000);
+                valueAnimator.setInterpolator(new LinearInterpolator());
+                valueAnimator.addUpdateListener(new ValueAnimator.AnimatorUpdateListener() {
+                    @Override
+                    public void onAnimationUpdate(ValueAnimator valueAnimator) {
+                        int degree = (int) valueAnimator.getAnimatedValue();
+                        //if (degree % 2 == 0) {//每变化两度才更新一次
+                        currentDegree = degree;
+                        timeRemians = String.valueOf(duration - valueAnimator.getCurrentPlayTime() / 1000);
+                        textPaint.getTextBounds(timeRemians, 0, timeRemians.length(), textBounds);
+                        postInvalidate();
+                        //}
+
+                        if (degree == 360 && listener != null) {
+                            listener.onFinished();
+                        }
+                    }
+                });
             }
+            valueAnimator.start();
+        } else {//所在窗口失去焦点
+            valueAnimator.cancel();
         }
     }
 
