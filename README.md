@@ -31,5 +31,3 @@ CountdownView countdownView = new CountdownView(this, 20, listener)
     .setTextsize(200)//文字尺寸
     .setColor(backgroundColor, forgroundColor, textColor);//背景色、前景色、文字颜色
 ```
-
-> 注意，本控件的实际计时时间 = 传入的计时时间 + 绘图时间。如果要追求非常精确的计时效果，可以创建一个计时器（比如Timer）来专门负责计时和调用invalidate方法，但是不要忘记在CountdownView被从窗口中移除时停止计时器。
